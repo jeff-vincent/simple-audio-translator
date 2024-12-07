@@ -1,1 +1,1 @@
-# simple-translator
+# simple-audio-translator
