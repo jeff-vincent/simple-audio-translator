@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: combined-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/affinity: "cookie"  # Sticky sessions for WebSocket
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"  # Increase timeout for WebSocket connections
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"  # Disable buffering for WebSocket traffic
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /ws/audio  # WebSocket endpoint
+        pathType: Prefix
+        backend:
+          service:
+            name: websocket-service
+            port:
+              number: 8000
+      - path: /  # Regular HTTP requests
+        pathType: Prefix
+        backend:
+          service:
+            name: http-service
+            port:
+              number: 8080
