@@ -3,12 +3,15 @@ from fastapi.concurrency import run_in_threadpool
 import asyncio
 import redis
 import json
+import base64
 
 app = FastAPI()
 
 # Store WebSocket connections
 connections = {}
 audio_chunks = []
+
+r = redis.Redis()
 
 @app.websocket("/ws/audio")
 async def audio_stream(websocket: WebSocket):
@@ -22,11 +25,13 @@ async def audio_stream(websocket: WebSocket):
             # Receive audio chunk
             audio_chunk = await websocket.receive_bytes()
             print(f"Received audio chunk: {len(audio_chunk)} bytes")
-            labeled_data = {'audio_chunk': audio_chunk.decode('rtf-8'), 'connection_id': connection_id}
-            redis.rpush('incoming_audio', json.dumps(labeled_data))
+            print(audio_chunk)
+            labeled_data = {'audio_chunk': base64.b64encode(audio_chunk).decode('utf-8'), 'connection_id': connection_id}
+            result = r.rpush('incoming_audio', json.dumps(labeled_data))
+            print(result)
             
             # Store the audio chunk with its connection ID
-            audio_chunks.append(labeled_data)
+            # audio_chunks.append(labeled_data)
     except Exception as e:
         print(f"WebSocket error in {connection_id}: {e}")
     finally:
