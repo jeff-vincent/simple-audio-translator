@@ -9,20 +9,24 @@ class TextTranslator():
         self.redis_host = os.environ.get('REDIS_HOST')
         self.redis_port = os.environ.get('REDIS_PORT')
         self.r = redis.Redis()
-        self.incoming_text = None
-        self.output_text = None
         self.openai_api_client = OpenAI(api_key='')
 
 
     async def read_text_from_redis_queue(self):
-        key, data = self.r.blpop("written_text", timeout=0)
+        key, data = self.r.blpop("text_to_translate", timeout=0)
         if data:
             print(f"Processing data from {key}")
-            print(data)
-            return data
+            data = json.loads(data)
+            text_to_tranlate = data['text']
+            connection_id = data['connection_id']
+
+            return text_to_tranlate, connection_id
 
     def translate_text(self, data):
-        prompt = f"If the following text is in English, translate it to Spanish, and if it is in Spanish, translate it to English: {data}"
+        # TODO: add dropdown to select source / target language in UI
+        source_language = 'English'
+        target_language = 'Spanish'
+        prompt = f"Translate the following from {source_language} to {target_language}: {data}"
         response = self.openai_api_client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -36,16 +40,17 @@ class TextTranslator():
         return response.choices[0].message.content
         
 
-    async def write_translated_text_to_redis_queue(self):
-        pass
+    def write_translated_text_to_redis_queue(self, translated_text, connection_id):
+        data = {'text': translated_text, 'connection_id': connection_id}
+        self.r.rpush('translated_text', json.dumps(data))
 
     async def run(self):
         while True:
-            data = await self.read_text_from_redis_queue()
-            if data:
-                translated_text = self.translate_text(data)
+            text_to_translate, connection_id = await self.read_text_from_redis_queue()
+            if text_to_translate:
+                translated_text = self.translate_text(text_to_translate)
                 print(translated_text)
-            #     self.write_translated_text_to_redis_queue(translated_text)
+                self.write_translated_text_to_redis_queue(translated_text, connection_id)
 
 if __name__ == "__main__":
     text_translator = TextTranslator()
