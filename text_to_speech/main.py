@@ -31,11 +31,12 @@ class TextToSpeech():
             voice="alloy",
             input=text
             )
+        print(response)
         return response.content
 
     async def write_translated_audio_to_redis_queue(self, translated_audio, connection_id):
         data = {'audio': base64.b64encode(translated_audio).decode('utf-8'), 'connection_id': connection_id}
-        self.r.rpush('translated_audio', json.dumps(data))
+        self.r.publish('output', json.dumps(data))
         return None
 
     async def run(self):

@@ -13,6 +13,9 @@ connections = {}
 # Initialize Redis client
 r = redis.Redis()
 
+pubsub = r.pubsub()
+pubsub.subscribe('output')
+
 @app.websocket("/ws/audio")
 async def audio_stream(websocket: WebSocket):
     """
@@ -65,20 +68,21 @@ async def send_response():
     """
     Background task to process audio messages from Redis and send responses back to WebSocket clients.
     """
-    while True:
-        try:
-            # Blocking pop from the Redis queue for translated audio
-            result = r.blpop('translated_audio', timeout=0)
-            if result:
-                key, data = result
+    try:
+        for message in pubsub.listen():
+            print(message)
+            if message["type"] == "message":
+                data = message['data']
                 data = json.loads(data)
-                
+
                 # Decode audio data and get connection ID
                 audio_chunk = base64.b64decode(data['audio'])
                 connection_id = data['connection_id']
 
                 # Retrieve the WebSocket connection
                 websocket = connections.get(connection_id)
+
+                # Send the audio chunk to the WebSocket client if it exists and is active
                 if websocket:
                     try:
                         # Send the audio chunk back to the WebSocket client
@@ -86,7 +90,8 @@ async def send_response():
                         print(f"Sent audio chunk to {connection_id}")
                     except Exception as e:
                         print(f"Failed to send audio chunk to {connection_id}: {e}")
-        except Exception as e:
-            print(f"Error in send_response: {e}")
-            await asyncio.sleep(5)  # Avoid tight loop in case of errors
-        await asyncio.sleep(1)  # Delay to avoid busy-waiting
+
+    except Exception as e:
+        print(f"Error in send_response: {e}")
+        await asyncio.sleep(5)  # Avoid tight loop in case of errors
+    await asyncio.sleep(1)  # Delay to avoid busy-waiting
