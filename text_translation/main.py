@@ -11,6 +11,7 @@ class TextTranslator():
         self.r = redis.Redis()
         self.openai_api_client = OpenAI(api_key='')
 
+
     async def read_text_from_redis_queue(self):
         key, data = self.r.blpop("text_to_translate", timeout=0)
         if data:
